@@ -8,6 +8,7 @@ from typing import Literal, Optional
 from agents.document_agent import create_document, review_document, update_document
 from brand.brand_manager import save_brand, get_brand, list_brands
 from feedback.feedback_store import store_feedback
+from history.history_store import save_document, get_history, delete_document
 
 app = FastAPI(title="Brand-Aware Document Agent API")
 
@@ -55,7 +56,7 @@ def fetch_brand(brand_id: str):
 class GenerateRequest(BaseModel):
     topic: str
     doc_type: Literal["report", "proposal", "presentation", "brief"]
-    output_format: Literal["docx", "pptx", "pdf", "excel"]
+    output_format: Literal["docx", "pptx", "pdf", "xlsx"]
     brand_id: str
 
 
@@ -71,14 +72,37 @@ def generate(req: GenerateRequest):
             output_format=req.output_format,
             brand=brand,
         )
+        # Save to history
+        save_document(
+            doc_id=result["doc_id"],
+            topic=req.topic,
+            doc_type=req.doc_type,
+            output_format=req.output_format,
+            brand_id=req.brand_id,
+            filename=os.path.basename(result["output_path"]),
+            raw_content=result["raw_content"],
+        )
+
+        # Auto-review and store high-scoring outputs for self-improvement
+        try:
+            auto_review = review_document(result["raw_content"], req.doc_type, brand)
+            result["auto_review"] = auto_review
+            if auto_review.get("score", 0) >= 8:
+                store_feedback(req.topic, result["output_path"], auto_review["score"], "auto-stored")
+        except Exception:
+            result["auto_review"] = None
+
         return {
             "message": "Document generated",
             "doc_id": result["doc_id"],
             "output_path": result["output_path"],
             "raw_content": result["raw_content"],
+            "auto_review": result.get("auto_review"),
             "download_url": f"/download/{os.path.basename(result['output_path'])}",
         }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -155,3 +179,16 @@ def update(req: UpdateRequest):
         "raw_content": result["raw_content"],
         "download_url": f"/download/{os.path.basename(result['output_path'])}",
     }
+
+
+# --- History endpoints ---
+
+@app.get("/history")
+def list_history(limit: int = 20):
+    return get_history(limit)
+
+
+@app.delete("/history/{doc_id}")
+def remove_from_history(doc_id: str):
+    delete_document(doc_id)
+    return {"message": "Deleted"}

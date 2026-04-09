@@ -1,5 +1,6 @@
 import json
 import uuid
+import time
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -8,6 +9,7 @@ from feedback.feedback_store import get_top_examples
 from tools.docx_tool import generate_docx
 from tools.pptx_tool import generate_pptx
 from tools.pdf_tool import generate_pdf
+from tools.excel_tool import generate_excel
 
 llm = ChatOpenAI(
     model=settings.openrouter_model,
@@ -17,10 +19,19 @@ llm = ChatOpenAI(
 )
 
 
-def _invoke(prompt: str) -> str:
+def _invoke(prompt: str, retries: int = 3) -> str:
     chain = ChatPromptTemplate.from_messages([("human", "{input}")]) | llm | StrOutputParser()
-    raw = chain.invoke({"input": prompt})
-    return raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+    for attempt in range(retries):
+        try:
+            raw = chain.invoke({"input": prompt})
+            return raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        except Exception as e:
+            if "429" in str(e) and attempt < retries - 1:
+                wait = 10 * (attempt + 1)
+                print(f"Rate limited, retrying in {wait}s...")
+                time.sleep(wait)
+            else:
+                raise
 
 
 def _brand_context(brand: dict) -> str:
@@ -41,6 +52,8 @@ def _render_file(parsed, doc_type: str, output_format: str, topic: str, brand: d
         return generate_docx(title=parsed.get("title", topic), content=parsed.get("content", ""), brand=brand, filename=filename)
     elif output_format == "pdf":
         return generate_pdf(title=parsed.get("title", topic), content=parsed.get("content", ""), brand=brand, filename=filename)
+    elif output_format == "xlsx":
+        return generate_excel(title=parsed.get("title", topic), content=parsed.get("content", ""), brand=brand, filename=filename)
 
 
 # ── 1. CREATE ────────────────────────────────────────────────────────────────

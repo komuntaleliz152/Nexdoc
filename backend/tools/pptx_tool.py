@@ -1,14 +1,12 @@
 import os
 from pptx import Presentation
-from pptx.util import Inches, Pt
+from pptx.util import Pt, Emu
 from pptx.dml.color import RGBColor
+from pptx.util import Inches
 from config import settings
 
 
 def generate_pptx(title: str, slides_content: list[dict], brand: dict, filename: str) -> str:
-    """
-    slides_content: list of {"title": str, "body": str}
-    """
     os.makedirs(settings.output_dir, exist_ok=True)
     prs = Presentation()
     primary_color = _hex_to_rgb(brand.get("primary_color", "#000000"))
@@ -18,12 +16,25 @@ def generate_pptx(title: str, slides_content: list[dict], brand: dict, filename:
         slide_layout = prs.slide_layouts[1]  # title + content
         slide = prs.slides.add_slide(slide_layout)
 
+        # Brand color background accent bar (left edge)
+        left_bar = slide.shapes.add_shape(
+            1,  # MSO_SHAPE_TYPE.RECTANGLE
+            0, 0,
+            Inches(0.12), prs.slide_height
+        )
+        left_bar.fill.solid()
+        left_bar.fill.fore_color.rgb = RGBColor(*primary_color)
+        left_bar.line.fill.background()
+
         # Title
         tf = slide.shapes.title.text_frame
         tf.text = slide_data.get("title", "")
-        tf.paragraphs[0].runs[0].font.color.rgb = RGBColor(*primary_color)
-        tf.paragraphs[0].runs[0].font.name = font
-        tf.paragraphs[0].runs[0].font.size = Pt(28)
+        p = tf.paragraphs[0]
+        if p.runs:
+            p.runs[0].font.color.rgb = RGBColor(*primary_color)
+            p.runs[0].font.name = font
+            p.runs[0].font.size = Pt(28)
+            p.runs[0].font.bold = True
 
         # Body
         body = slide.placeholders[1].text_frame
