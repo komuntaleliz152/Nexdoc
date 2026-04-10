@@ -161,7 +161,7 @@ def review(req: ReviewRequest):
 class UpdateRequest(BaseModel):
     raw_content: dict | list
     doc_type: Literal["report", "proposal", "presentation", "brief"]
-    output_format: Literal["docx", "pptx", "pdf"]
+    output_format: Literal["docx", "pptx", "pdf", "xlsx"]
     topic: str
     brand_id: str
     feedback: str
