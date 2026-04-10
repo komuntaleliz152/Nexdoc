@@ -123,6 +123,10 @@ class FeedbackRequest(BaseModel):
     rating: int  # 1-5
     notes: Optional[str] = ""
 
+    @property
+    def validated_rating(self):
+        return max(1, min(5, self.rating))
+
 
 @app.post("/feedback")
 def feedback(req: FeedbackRequest):
@@ -192,3 +196,15 @@ def list_history(limit: int = 20):
 def remove_from_history(doc_id: str):
     delete_document(doc_id)
     return {"message": "Deleted"}
+
+
+# --- Logo endpoint ---
+
+@app.get("/brands/{brand_id}/logo")
+def get_logo(brand_id: str):
+    from tools.logo_generator import generate_logo
+    brand = get_brand(brand_id)
+    if not brand:
+        raise HTTPException(status_code=404, detail="Brand not found")
+    path = generate_logo(brand)
+    return FileResponse(path, media_type="image/png")

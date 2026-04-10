@@ -1,8 +1,8 @@
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    openrouter_api_key: str
-    openrouter_model: str = "mistralai/mistral-7b-instruct:free"
+    groq_api_key: str
+    groq_model: str = "llama-3.3-70b-versatile"
     chroma_persist_dir: str = "./chroma_db"
     output_dir: str = "./outputs"
 

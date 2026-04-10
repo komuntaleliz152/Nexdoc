@@ -1,7 +1,7 @@
 import json
 import uuid
 import time
-from langchain_openai import ChatOpenAI
+from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from config import settings
@@ -11,15 +11,15 @@ from tools.pptx_tool import generate_pptx
 from tools.pdf_tool import generate_pdf
 from tools.excel_tool import generate_excel
 
-llm = ChatOpenAI(
-    model=settings.openrouter_model,
-    openai_api_key=settings.openrouter_api_key,
-    openai_api_base="https://openrouter.ai/api/v1",
-    temperature=0.7,
-)
-
+def _get_llm() -> ChatGroq:
+    return ChatGroq(
+        model=settings.groq_model,
+        groq_api_key=settings.groq_api_key,
+        temperature=0.7,
+    )
 
 def _invoke(prompt: str, retries: int = 3) -> str:
+    llm = _get_llm()
     chain = ChatPromptTemplate.from_messages([("human", "{input}")]) | llm | StrOutputParser()
     for attempt in range(retries):
         try:
@@ -27,7 +27,7 @@ def _invoke(prompt: str, retries: int = 3) -> str:
             return raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
         except Exception as e:
             if "429" in str(e) and attempt < retries - 1:
-                wait = 10 * (attempt + 1)
+                wait = 5 * (attempt + 1)
                 print(f"Rate limited, retrying in {wait}s...")
                 time.sleep(wait)
             else:
@@ -45,15 +45,30 @@ def _brand_context(brand: dict) -> str:
 
 def _render_file(parsed, doc_type: str, output_format: str, topic: str, brand: dict, doc_id: str) -> str:
     filename = f"{doc_id}.{output_format}"
+    # Normalize: if LLM returned a list for a non-presentation, wrap it
+    if isinstance(parsed, list):
+        if output_format == "pptx":
+            return generate_pptx(title=topic, slides_content=parsed, brand=brand, filename=filename)
+        else:
+            # Convert list of items into a single content string
+            content = "\n\n".join(
+                item.get("body", item.get("content", str(item))) if isinstance(item, dict) else str(item)
+                for item in parsed
+            )
+            title = topic
+    else:
+        title = parsed.get("title", topic)
+        content = parsed.get("content", "")
+
     if output_format == "pptx":
-        slides = parsed if isinstance(parsed, list) else parsed.get("slides", [])
+        slides = parsed if isinstance(parsed, list) else parsed.get("slides", [{"title": topic, "body": content}])
         return generate_pptx(title=topic, slides_content=slides, brand=brand, filename=filename)
     elif output_format == "docx":
-        return generate_docx(title=parsed.get("title", topic), content=parsed.get("content", ""), brand=brand, filename=filename)
+        return generate_docx(title=title, content=content, brand=brand, filename=filename)
     elif output_format == "pdf":
-        return generate_pdf(title=parsed.get("title", topic), content=parsed.get("content", ""), brand=brand, filename=filename)
+        return generate_pdf(title=title, content=content, brand=brand, filename=filename)
     elif output_format == "xlsx":
-        return generate_excel(title=parsed.get("title", topic), content=parsed.get("content", ""), brand=brand, filename=filename)
+        return generate_excel(title=title, content=content, brand=brand, filename=filename)
 
 
 # ── 1. CREATE ────────────────────────────────────────────────────────────────

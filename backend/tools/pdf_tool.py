@@ -1,10 +1,11 @@
 import os
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from config import settings
+from tools.logo_generator import generate_logo
 
 
 def generate_pdf(title: str, content: str, brand: dict, filename: str) -> str:
@@ -20,20 +21,26 @@ def generate_pdf(title: str, content: str, brand: dict, filename: str) -> str:
 
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(
-        "BrandTitle",
-        parent=styles["Title"],
-        textColor=primary_color,
-        fontSize=24,
-        spaceAfter=12,
+        "BrandTitle", parent=styles["Title"],
+        textColor=primary_color, fontSize=24, spaceAfter=12,
     )
     body_style = ParagraphStyle(
-        "BrandBody",
-        parent=styles["Normal"],
-        fontSize=11,
-        leading=16,
+        "BrandBody", parent=styles["Normal"],
+        fontSize=11, leading=16,
     )
 
-    story = [Paragraph(title, title_style), Spacer(1, 6*mm)]
+    story = []
+
+    # Logo
+    try:
+        logo_path = generate_logo(brand)
+        story.append(Image(logo_path, width=160, height=50))
+        story.append(Spacer(1, 4*mm))
+    except Exception:
+        pass
+
+    story.append(Paragraph(title, title_style))
+    story.append(Spacer(1, 6*mm))
     for para in content.split("\n\n"):
         story.append(Paragraph(para.strip(), body_style))
         story.append(Spacer(1, 4*mm))

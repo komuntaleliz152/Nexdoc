@@ -4,6 +4,7 @@ from docx.shared import Pt, RGBColor, Inches
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 from config import settings
+from tools.logo_generator import generate_logo
 
 
 def generate_docx(title: str, content: str, brand: dict, filename: str) -> str:
@@ -12,6 +13,14 @@ def generate_docx(title: str, content: str, brand: dict, filename: str) -> str:
 
     primary_color = _hex_to_rgb(brand.get("primary_color", "#000000"))
     font_name = brand.get("font", "Calibri")
+
+    # Logo
+    try:
+        logo_path = generate_logo(brand)
+        doc.add_picture(logo_path, width=Inches(2.5))
+        doc.add_paragraph()
+    except Exception:
+        pass
 
     # Title
     heading = doc.add_heading(title, level=1)
