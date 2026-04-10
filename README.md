@@ -4,7 +4,7 @@
 - Backend: Python + FastAPI + LangChain + Gemini 1.5 Pro
 - Frontend: Next.js + Tailwind CSS
 - Storage: ChromaDB (brand memory + feedback)
-- Output: PDF, DOCX, PPTX
+- Output: PDF, DOCX, PPTX EXCEL
 
 ## Setup
 
