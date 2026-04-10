@@ -5,10 +5,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Literal, Optional
 
-from agents.document_agent import create_document, review_document, update_document
+from agents.document_agent import create_document, review_document, update_document, extract_skills
 from brand.brand_manager import save_brand, get_brand, list_brands
 from feedback.feedback_store import store_feedback
 from history.history_store import save_document, get_history, delete_document
+from skills.skills_store import save_skill, list_all_skills, delete_skill
 
 app = FastAPI(title="Brand-Aware Document Agent API")
 
@@ -87,8 +88,13 @@ def generate(req: GenerateRequest):
         try:
             auto_review = review_document(result["raw_content"], req.doc_type, brand)
             result["auto_review"] = auto_review
-            if auto_review.get("score", 0) >= 8:
-                store_feedback(req.topic, result["output_path"], auto_review["score"], "auto-stored")
+            score = auto_review.get("score", 0)
+            if score >= 8:
+                store_feedback(req.topic, result["output_path"], score, "auto-stored")
+                # Extract and save skills from high-scoring docs
+                skills = extract_skills(result["raw_content"], req.doc_type, brand, score)
+                for skill in skills:
+                    save_skill(skill, req.doc_type, brand.get("industry", "general"))
         except Exception:
             result["auto_review"] = None
 
@@ -208,3 +214,28 @@ def get_logo(brand_id: str):
         raise HTTPException(status_code=404, detail="Brand not found")
     path = generate_logo(brand)
     return FileResponse(path, media_type="image/png")
+
+
+# --- Skills endpoints ---
+
+@app.get("/skills")
+def get_skills_list():
+    return list_all_skills()
+
+
+class SkillRequest(BaseModel):
+    skill: str
+    doc_type: str = "general"
+    industry: str = "general"
+
+
+@app.post("/skills")
+def add_skill(req: SkillRequest):
+    save_skill(req.skill, req.doc_type, req.industry, source="manual")
+    return {"message": "Skill saved"}
+
+
+@app.delete("/skills/{skill_id}")
+def remove_skill(skill_id: str):
+    delete_skill(skill_id)
+    return {"message": "Skill deleted"}

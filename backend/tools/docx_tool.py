@@ -43,6 +43,13 @@ def generate_docx(title: str, content: str, brand: dict, filename: str) -> str:
             for r in sub.runs:
                 r.font.color.rgb = RGBColor(*primary_color)
                 r.font.name = font_name
+                r.font.bold = True
+        elif len(para.split("\n")) == 1 and len(para) < 60 and not para.endswith("."):
+            sub = doc.add_heading(para.strip(), level=2)
+            for r in sub.runs:
+                r.font.color.rgb = RGBColor(*primary_color)
+                r.font.name = font_name
+                r.font.bold = True
         else:
             p = doc.add_paragraph(para)
             for r in p.runs:

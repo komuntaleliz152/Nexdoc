@@ -6,6 +6,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from config import settings
 from feedback.feedback_store import get_top_examples
+from skills.skills_store import get_skills, save_skill
 from tools.docx_tool import generate_docx
 from tools.pptx_tool import generate_pptx
 from tools.pdf_tool import generate_pdf
@@ -78,15 +79,22 @@ def create_document(topic: str, doc_type: str, output_format: str, brand: dict) 
     examples_ctx = ("\n\nHighly-rated past examples:\n" + "\n---\n".join(examples[:2])) if examples else ""
     brand_ctx = _brand_context(brand)
 
+    # Inject learned skills
+    skills = get_skills(doc_type=doc_type, industry=brand.get("industry", ""))
+    skills_ctx = ""
+    if skills:
+        skill_list = "\n".join(f"- {s['skill']}" for s in skills)
+        skills_ctx = f"\n\nLearned skills to apply:\n{skill_list}"
+
     if doc_type == "presentation":
         prompt = (
-            f"You are a brand-aware document creator.\n{brand_ctx}{examples_ctx}\n\n"
+            f"You are a brand-aware document creator.\n{brand_ctx}{examples_ctx}{skills_ctx}\n\n"
             f"Create a professional presentation on: {topic}\n"
             f"Return a JSON array of slide objects with 'title' and 'body' keys. 5-7 slides. ONLY valid JSON."
         )
     else:
         prompt = (
-            f"You are a brand-aware document creator.\n{brand_ctx}{examples_ctx}\n\n"
+            f"You are a brand-aware document creator.\n{brand_ctx}{examples_ctx}{skills_ctx}\n\n"
             f"Create a professional {doc_type} on: {topic}\n"
             f"Return a JSON object with 'title' (string) and 'content' (string, paragraphs separated by \\n\\n). ONLY valid JSON."
         )
@@ -102,6 +110,8 @@ def create_document(topic: str, doc_type: str, output_format: str, brand: dict) 
         "topic": topic,
         "doc_type": doc_type,
         "output_format": output_format,
+        "improved_from_feedback": len(examples) > 0,
+        "examples_used": len(examples),
     }
 
 
@@ -165,3 +175,26 @@ def update_document(
         "doc_type": doc_type,
         "output_format": output_format,
     }
+
+
+# ── 4. EXTRACT SKILLS ────────────────────────────────────────────────────────
+
+def extract_skills(raw_content, doc_type: str, brand: dict, score: int) -> list:
+    """Extract reusable writing skills from a high-scoring document."""
+    if score < 7:
+        return []
+    brand_ctx = _brand_context(brand)
+    content_str = json.dumps(raw_content, indent=2)[:2000]  # limit size
+
+    prompt = (
+        f"You are an AI writing coach analyzing a high-quality {doc_type}.\n"
+        f"{brand_ctx}\n\n"
+        f"Document:\n{content_str}\n\n"
+        f"Extract 3 concise, reusable writing skills or patterns that made this document effective.\n"
+        f"Return a JSON array of strings. Each skill should be one sentence. ONLY valid JSON."
+    )
+    try:
+        result = json.loads(_invoke(prompt))
+        return result if isinstance(result, list) else []
+    except Exception:
+        return []
