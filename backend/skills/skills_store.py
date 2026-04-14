@@ -1,32 +1,29 @@
-import chromadb
-import uuid
+from tinydb import TinyDB, Query
 from config import settings
+import os
+import uuid
 
-client = chromadb.PersistentClient(path=settings.chroma_persist_dir)
-collection = client.get_or_create_collection("agent_skills")
+os.makedirs(settings.chroma_persist_dir, exist_ok=True)
+db = TinyDB(os.path.join(settings.chroma_persist_dir, "skills.json"))
 
 
 def save_skill(skill: str, doc_type: str, industry: str, source: str = "auto"):
-    collection.add(
-        ids=[str(uuid.uuid4())],
-        documents=[skill],
-        metadatas=[{"skill": skill, "doc_type": doc_type, "industry": industry, "source": source}],
-    )
+    db.insert({"id": str(uuid.uuid4()), "skill": skill, "doc_type": doc_type,
+               "industry": industry, "source": source})
 
 
 def get_skills(doc_type: str = "", industry: str = "", n: int = 5) -> list:
-    try:
-        query = f"{doc_type} {industry}".strip() or "document"
-        results = collection.query(query_texts=[query], n_results=n)
-        return results["metadatas"][0] if results["metadatas"] else []
-    except Exception:
-        return []
+    items = db.all()
+    # Filter by doc_type or industry if provided
+    filtered = [i for i in items if
+                (not doc_type or i.get("doc_type") in (doc_type, "general")) and
+                (not industry or i.get("industry") in (industry, "general"))]
+    return filtered[:n]
 
 
 def list_all_skills() -> list:
-    result = collection.get()
-    return result["metadatas"] if result["metadatas"] else []
+    return db.all()
 
 
 def delete_skill(skill_id: str):
-    collection.delete(ids=[skill_id])
+    db.remove(Query().id == skill_id)

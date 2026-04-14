@@ -1,26 +1,21 @@
-import chromadb
+from tinydb import TinyDB, Query
 from config import settings
-from typing import Optional
+import os
 
-client = chromadb.PersistentClient(path=settings.chroma_persist_dir)
-collection = client.get_or_create_collection("brand_profiles")
+os.makedirs(settings.chroma_persist_dir, exist_ok=True)
+db = TinyDB(os.path.join(settings.chroma_persist_dir, "brands.json"))
 
 
 def save_brand(brand_id: str, brand: dict):
-    collection.upsert(
-        ids=[brand_id],
-        documents=[str(brand)],
-        metadatas=[brand],
-    )
+    Brand = Query()
+    db.upsert(brand, Brand.id == brand_id)
 
 
-def get_brand(brand_id: str) -> Optional[dict]:
-    result = collection.get(ids=[brand_id])
-    if result and result["metadatas"]:
-        return result["metadatas"][0]
-    return None
+def get_brand(brand_id: str) -> dict | None:
+    Brand = Query()
+    result = db.search(Brand.id == brand_id)
+    return result[0] if result else None
 
 
 def list_brands() -> list:
-    result = collection.get()
-    return result["metadatas"] if result["metadatas"] else []
+    return db.all()
