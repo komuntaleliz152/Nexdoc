@@ -239,3 +239,19 @@ def add_skill(req: SkillRequest):
 def remove_skill(skill_id: str):
     delete_skill(skill_id)
     return {"message": "Skill deleted"}
+
+
+# --- Stats endpoint ---
+
+@app.get("/stats")
+def get_stats():
+    from history.history_store import get_history
+    from skills.skills_store import list_all_skills
+    from feedback.feedback_store import get_top_examples
+    docs = get_history(limit=1000)
+    skills = list_all_skills()
+    return {
+        "documents_generated": len(docs),
+        "skills_learned": len(skills),
+        "brands": len(list_brands()),
+    }
