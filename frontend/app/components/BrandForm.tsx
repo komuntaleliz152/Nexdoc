@@ -20,10 +20,11 @@ export default function BrandForm({ onSaved }: { onSaved: () => void }) {
     const e: Record<string, string> = {};
     if (!form.id.trim()) e.id = "Required.";
     else if (!/^[a-z0-9_-]+$/.test(form.id)) e.id = "Lowercase, no spaces.";
-    if (!form.name.trim()) e.name = "Required.";
-    setErrors(e);
+    if (!form.name.trim()) e.name = "Required.";    setErrors(e);
     return Object.keys(e).length === 0;
   };
+
+  const cap = (val: string) => val.charAt(0).toUpperCase() + val.slice(1);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,7 +77,7 @@ export default function BrandForm({ onSaved }: { onSaved: () => void }) {
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Brand Name</label>
-            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
+            <input value={form.name} onChange={(e) => setForm({ ...form, name: cap(e.target.value) })}
               placeholder="e.g. Diva Cosmetics"
               className={`w-full rounded-xl px-4 py-2.5 text-sm bg-gray-50 border focus:outline-none focus:ring-2 focus:ring-green-400 focus:bg-white transition-all ${errors.name ? "border-red-300" : "border-gray-200"}`} />
             {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
