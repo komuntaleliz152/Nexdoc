@@ -255,3 +255,8 @@ def get_stats():
         "skills_learned": len(skills),
         "brands": len(list_brands()),
     }
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
